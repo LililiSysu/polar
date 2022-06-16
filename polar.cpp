@@ -1074,6 +1074,7 @@ unsigned short polar::u_crc16() {
 			for (int j = 0; i + j < len; ++j) {
 				data |= u[i + j] << j;
 			}
+			i = len;
 		}
 		crc_h8 = (crc16 >> 8);
 		crc_l8 = (crc16 << 8);
@@ -1133,6 +1134,7 @@ unsigned short polar::du_crc16() {
 			for (int j = 0; i + j < len; ++j) {
 				data |= decoded_u[i + j] << j;
 			}
+			i = len;
 		}
 		crc_h8 = (crc16 >> 8);
 		crc_l8 = (crc16 << 8);
