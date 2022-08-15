@@ -17,18 +17,25 @@ using namespace std;
 void count_running_time(int start_n = 6, int end_n = 10, \
 	double _rate = 0.5, int _list_num = 8, int _round = 100);
 
-void test_error_rate(double start_SNR = 1, double end_SNR = 2.5, double SNR_step = 0.25, \
-	int n = 10, double rate = 0.5, vector<int> list_num = { 2,4,8,16,32 }, int _round = 20, \
+void test_error_rate(double start_SNR = 1, double end_SNR = 2, double SNR_step = 1, \
+	int n = 10, double rate = 1.0/3, vector<int> list_num = { 32 }, int _round = 20, \
 	bool is_CRC16_aided = true);
 
 void test_error_rate2(vector<double> SNR = { 1,1.25,1.5,1.75,2,2.25,2.5 }, \
 	int n = 10, double rate = 0.5, vector<int> list_num = { 2,4,8,16,32 }, \
 	vector<int> _round = { 0,0,0,0,0,20000,0 }, bool is_CRC16_aided = true);
 
+void test_error_rate_adaptive_fast_SCL(vector<double> SNR = { 1,1.5,2,2.5 }, \
+	int n = 10, double rate = 0.5, vector<int> _round = { 0,0,3000,0 });
+
 int main()
 {
 	//count_running_time();
-	test_error_rate2();
+	//test_error_rate();
+	//test_error_rate2();
+
+	test_error_rate_adaptive_fast_SCL();
+	//test_error_rate2({ 2 }, 10, 0.5, { 32 }, { 3000 }, true);
 
 	return 0;
 }
@@ -303,5 +310,63 @@ void test_error_rate2(vector<double> SNR, int n, double rate, vector<int> list_n
 		printf("%e", fast_SCL_error_rate[k][qlen - 1]);
 		printf(" ]\n");
 	}
+	/**/
+}
+
+void test_error_rate_adaptive_fast_SCL(vector<double> SNR, int n, double rate, vector<int> _round) {
+	polar q(n);
+	q.set_rate(rate);
+	q.set_is_CRC16_aided(true);
+	int qlen = SNR.size();
+	vector<double> adaptive_fast_SCL_error_rate;
+	for (int i = 0; i < qlen; ++i) {
+		q.set_SNR(SNR[i]);
+		if (_round[i] == 0) {
+			adaptive_fast_SCL_error_rate.push_back(0);
+			q.clear_error_count();
+			continue;
+		}
+		for (int j = 0; j < _round[i]; ++j) {
+			q.generate_random_u();
+			q.encode();
+
+			q.modulation();
+			q.add_noise();
+			//q.pass_channel();
+
+			q.information_bit_count();
+
+			//q.SC_decode();
+			//q.SC_error_count();
+
+			//q.fast_SC_decode();
+			//q.fast_SC_error_count();
+
+			q.adaptive_fast_SCL_decode();
+			q.fast_SCL_error_count();
+
+		}
+		//printf("SC_error_rate		: %e\n", q.SC_error_rate());
+
+		adaptive_fast_SCL_error_rate.push_back(q.fast_SCL_error_rate());
+		q.clear_error_count();
+	}
+
+	printf("error rate verse SNR, N=%d, rate=%f\n", (1 << n), rate);
+
+	printf("SNR = [ ");
+	for (int i = 0; i < qlen - 1; ++i) {
+		printf("%f, ", SNR[i]);
+	}
+	printf("%f", SNR.back());
+	printf(" ]\n");
+
+	printf("adaptive_fast_SC_error_rate = [ ");
+	for (int i = 0; i < qlen - 1; ++i) {
+		printf("%e, ", adaptive_fast_SCL_error_rate[i]);
+	}
+	printf("%e", adaptive_fast_SCL_error_rate[qlen - 1]);
+	printf(" ]\n");
+
 	/**/
 }
