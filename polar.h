@@ -50,7 +50,9 @@ private:
 	bool is_CRC16_aided;		// whether use CRC16 for polar code
 	bool is_SCL_decode_failed;	// whether SCL decode failed
 	int SCL_decode_failed_time;	// times of SCL decode failed
-	int SCL_decode_failed_bit;	// number of bit cast due to SCL decode failed
+	int SCL_decode_failed_bit;	// number of bit cast due to SCL decode failed	
+	bool use_adaptive_L;		// whether change L adaptively, see 'adaptive_fast_SCL_decode()'
+
 
 	// private auxiliary member
 
@@ -475,4 +477,12 @@ public:
 	 * \return SCL error rate, that is 'total_fast_SCL_error_bit' over 'total_bit'
 	 */
 	double fast_SCL_error_rate();
+
+	/**
+	 * .adaptively increase parameter L as 1,2,4,8,16,32 until 
+	 * decode correction, if not at L 32, let the result be
+	 * with minimum path metric
+	 * 
+	 */
+	void adaptive_fast_SCL_decode();
 };
