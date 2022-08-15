@@ -65,6 +65,7 @@ polar::polar(int _n) :n(_n), N(1 << n){
 	SCL_decode_failed_bit = 0;
 	time_key_routine = 0;
 	total_fast_SCL_error_bit = 0;
+	use_adaptive_L = false;
 }
 
 polar::polar(int _n, const vector<int>& _u) : n(_n), N(1 << n), u(_u){
@@ -91,6 +92,7 @@ polar::polar(int _n, const vector<int>& _u) : n(_n), N(1 << n), u(_u){
 	SCL_decode_failed_bit = 0;
 	time_key_routine = 0;
 	total_fast_SCL_error_bit = 0;
+	use_adaptive_L = false;
 }
 
 // private member function
@@ -576,9 +578,9 @@ void polar::set_list_num(int _list_num){
 	list_num_is_set = true;
 
 	// variables
-	decoded_list_PM;
-	decoded_list_LLR;
-	decoded_list_eu;
+	//decoded_list_PM;
+	//decoded_list_LLR;
+	//decoded_list_eu;
 
 }
 
@@ -1226,11 +1228,26 @@ void polar::fast_SCL_decode() {
 		}
 
 		// no matching CRC16 in all the list, use the path with minimum path metric ?? or just erase this result
-		int ulen = u.size();
-		decoded_u.resize(ulen);
-		int path_ind = decoded_list_PM[0].first - 1;
-		for (int i = 0; i < ulen; ++i) {
-			decoded_u[i] = decoded_list_eu[path_ind][sorted_channel_ind_ZWi[i].first];	// get bit in active channel as decode result
+		if (use_adaptive_L == false) {
+			int ulen = u.size();
+			decoded_u.resize(ulen);
+			int path_ind = decoded_list_PM[0].first - 1;
+			for (int i = 0; i < ulen; ++i) {
+				decoded_u[i] = decoded_list_eu[path_ind][sorted_channel_ind_ZWi[i].first];	// get bit in active channel as decode result
+			}
+		}
+		else {
+			if (list_num == 32) {
+				int ulen = u.size();
+				decoded_u.resize(ulen);
+				int path_ind = decoded_list_PM[0].first - 1;
+				for (int i = 0; i < ulen; ++i) {
+					decoded_u[i] = decoded_list_eu[path_ind][sorted_channel_ind_ZWi[i].first];	// get bit in active channel as decode result
+				}
+			}
+			else {
+				use_adaptive_L = false;			// meaning NOT the end of adaption for L, just for flag
+			}
 		}
 		//is_SCL_decode_failed = true;		// erase the result makes error rate 0
 	}
@@ -1533,6 +1550,12 @@ void polar::fast_SCL_error_count(){
 		SCL_decode_failed_bit += ulen;
 	}
 	else {
+		if (use_adaptive_L) {
+			for (int i = 0; i < ulen; ++i) {
+				total_fast_SCL_error_bit += (decoded_u[i] != u[i]);
+			}
+			return;
+		}
 		switch (list_num) {
 		case 2:
 			for (int i = 0; i < ulen; ++i) {
@@ -1571,13 +1594,34 @@ double polar::fast_SCL_error_rate() {
 	if (total_bit == 0)	throw "error of no bit decoded and counted, \
 						use 'error_count()' first after decoding";
 	int real_SCL_error_bit;
-	switch (list_num) {
-	case 2:real_SCL_error_bit = total_SCL2_error_bit; break;
-	case 4:real_SCL_error_bit = total_SCL4_error_bit; break;
-	case 8:real_SCL_error_bit = total_SCL8_error_bit; break;
-	case 16:real_SCL_error_bit = total_SCL16_error_bit; break;
-	case 32:real_SCL_error_bit = total_SCL32_error_bit; break;
-	default:real_SCL_error_bit = total_fast_SCL_error_bit;
+	if (use_adaptive_L) {
+		real_SCL_error_bit = total_fast_SCL_error_bit;
+	}
+	else {
+		switch (list_num) {
+		case 2:real_SCL_error_bit = total_SCL2_error_bit; break;
+		case 4:real_SCL_error_bit = total_SCL4_error_bit; break;
+		case 8:real_SCL_error_bit = total_SCL8_error_bit; break;
+		case 16:real_SCL_error_bit = total_SCL16_error_bit; break;
+		case 32:real_SCL_error_bit = total_SCL32_error_bit; break;
+		default:real_SCL_error_bit = total_fast_SCL_error_bit;
+		}
 	}
 	return (double)real_SCL_error_bit / ((double)total_bit - (double)SCL_decode_failed_bit);
+}
+
+void polar::adaptive_fast_SCL_decode(){
+	if (!is_CRC16_aided) {
+		throw "need CRC16, use 'set_is_CRC16_aided()' set CRC16 first";
+	}
+	else {
+		list_num = 1;
+		list_num_is_set = true;
+		do {
+			use_adaptive_L = true;
+			fast_SCL_decode();
+			list_num <<= 1;
+		} while (!use_adaptive_L);
+		// 'use_adaptive_L' is true afrer exit
+	}
 }
